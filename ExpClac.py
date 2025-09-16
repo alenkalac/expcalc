@@ -1,7 +1,6 @@
 from collections import deque
 from datetime import datetime, timedelta
 from time import sleep
-
 import numpy as np
 import pytesseract
 import pyautogui
@@ -11,6 +10,7 @@ from PIL import Image
 import cv2
 
 import Overlay
+import Utils
 
 pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 windows = gw.getWindowsWithTitle("Maplestory Worlds-Artale(Global)")  # Replace with part of your window's title
@@ -63,14 +63,6 @@ def get_rates():
     """Return short-term and long-term EXP/hour."""
     return calc_exp_per_10(short_window), calc_exp_per_10(long_window)
 
-def validate_exp_string(value:str):
-    if "[" not in value: return False
-    #if "]" not in value: return False
-    if "." not in value: return False
-    if "%" not in value: return False
-
-    return True
-
 def get_game_exp(exp_region):
     screenshot = pyautogui.screenshot(region=exp_region)
     # screenshot = screenshot.convert('RGB')
@@ -91,10 +83,7 @@ def get_game_exp(exp_region):
     pil_img = Image.fromarray(img)
 
     text = pytesseract.image_to_string(pil_img, config='--psm 6 -c tessedit_char_whitelist=0123456789P[.%/]')
-    return extract_exp(text)
-
-def extract_exp(val:str):
-    return val[val.rindex("P")+1:val.index("%")+2]
+    return Utils.extract_exp(text)
 
 def main():
     overlay = Overlay.Overlay(win)
@@ -114,7 +103,7 @@ def main():
             text = get_game_exp(exp_region)
             print(text)
 
-            if not validate_exp_string(text):
+            if not Utils.validate_exp_string(text):
                 sleep(1)
                 continue
 
@@ -151,7 +140,7 @@ def main():
             if change2[1][0] > best_10[0]:
                 best_10 = [change2[1][0], change2[1][1]]
 
-            ttl = calc_time_to_level(pc_current, change2[1][1])
+            ttl = Utils.calc_time_to_level(pc_current, change2[1][1])
 
             print(f"Best 10: { best_10[0]} {as_percent(best_10[1])}%")
             print(f"Time to Level: {ttl} ")
@@ -180,16 +169,6 @@ def short_num(n: int) -> str:
         s = f"{num:.2f}{suffixes[idx]}".rstrip('0').rstrip('.')
 
     return s
-
-def calc_time_to_level(pc:float, change_per_10):
-    if change_per_10 == 0:
-        change_per_10 = 1
-
-    remain = 100-pc #100-20
-    remain = remain / change_per_10 * 10 / 60 #80/4 = 20(tens)
-    hrs = int(remain)
-    mins = int((remain-hrs) * 60)
-    return f"{hrs}h {mins}m"
 
 def as_percent(val):
     return "%0.2f" % val
