@@ -12,8 +12,6 @@ import cv2
 
 import Overlay
 
-debug=0
-
 pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 windows = gw.getWindowsWithTitle("Maplestory Worlds-Artale(Global)")  # Replace with part of your window's title
 if not windows:
@@ -24,13 +22,12 @@ win = windows[0]
 win.activate()
 
 # Step 2: Get window bounds
-x, y = win.left, win.top
-w, h = win.width, win.height
-
-region = (x, y, w, h)
+#x, y = win.left, win.top
+#w, h = win.width, win.height
 
 history = []
 
+## Max exp jump per second
 MAX_ALLOWED_EXP_JUMP = 100_000
 
 # Store (timestamp, exp_percent) tuples
@@ -66,22 +63,6 @@ def get_rates():
     """Return short-term and long-term EXP/hour."""
     return calc_exp_per_10(short_window), calc_exp_per_10(long_window)
 
-def find_exp_location():
-    screenshot = pyautogui.screenshot(region=region)
-    screenshot = screenshot.convert('RGB')
-    screenshot.show()
-
-    target_image = Image.open('images/target_image2.png')
-    location = pyautogui.locate(target_image, screenshot, confidence=0.8)  # Needs OpenCV installed for confidence param
-
-    if location:
-        ex, ey, width, height = location
-        #print(f"Found at: {ex}, {ey}, size: {width}x{height}")
-    else:
-        print("Image not found on screen.")
-
-    return location
-
 def validate_exp_string(value:str):
     if "[" not in value: return False
     #if "]" not in value: return False
@@ -95,16 +76,16 @@ def get_game_exp(exp_region):
     # screenshot = screenshot.convert('RGB')
     #screenshot.show()
 
-    gray = screenshot.convert("L")  # "L" mode = 8-bit pixels, black and white
+    #gray = screenshot.convert("L")  # "L" mode = 8-bit pixels, black and white
 
     # Convert Pillow → NumPy array (so OpenCV can process it)
-    img = np.array(gray)
+    img = np.array(screenshot)
 
     # Scale up 2x
-    img = cv2.resize(img, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
+    img = cv2.resize(img, None, fx=8, fy=8, interpolation=cv2.INTER_LINEAR)
 
     # Threshold (binarize)
-    _, img = cv2.threshold(img, 150, 255, cv2.THRESH_BINARY)
+    _, img = cv2.threshold(img, 200, 255, cv2.THRESH_BINARY)
 
     # Convert OpenCV image to PIL format
     pil_img = Image.fromarray(img)
@@ -113,21 +94,22 @@ def get_game_exp(exp_region):
     return extract_exp(text)
 
 def extract_exp(val:str):
-    return val[val.rindex("P")+1:val.index("%")+1]
+    return val[val.rindex("P")+1:val.index("%")+2]
 
 def main():
-    overlay = Overlay.Overlay()
+    overlay = Overlay.Overlay(win)
 
     exp_last = 0
     start_exp = 0
     pc_start = 0
-    gain_exp = 0
     exp_at_time=[]
     best_10 = [0,0]
 
-    exp_region = (x + int(w * 0.2), y + int(h * 0.92), int(w * 0.5), int(h * 0.035))
-
     while 1:
+        x, y = win.left, win.top
+        w, h = win.width, win.height
+        exp_region = (x + int(w * 0.5), y + int(h * 0.92), int(w * 0.2), int(h * 0.04))
+
         try:
             text = get_game_exp(exp_region)
             print(text)
@@ -139,21 +121,22 @@ def main():
             exp_current = int(text[:text.index("[")])
             pc_current = float(text[text.index("[")+1:text.index("%")])
 
-            if start_exp == 0:
-                start_exp = exp_current
-                pc_start = pc_current
-
             ## prevent exp loss - possible to lose exp due to dying but meh.
             if exp_last > exp_current:
                 continue
 
+            gain_exp = exp_current-exp_last
+
             ## allow for upto 100k exp
-            if exp_current > MAX_ALLOWED_EXP_JUMP:
+            if gain_exp > MAX_ALLOWED_EXP_JUMP and start_exp != 0:
                 continue
+
+            if start_exp == 0:
+                start_exp = exp_current
+                pc_start = pc_current
 
             exp_last = exp_current
 
-            gain_exp = exp_current-start_exp
             pc_total = pc_current - pc_start
             exp_at_time.append({int(time.time()), exp_current})
 
