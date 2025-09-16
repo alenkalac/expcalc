@@ -11,7 +11,7 @@ conf.debug_dissector = 2
 
 # A dictionary to store packets by their TCP sequence number
 tcp_streams = {}
-server_ip = '3.76.127.144'
+server_ip = ''
 
 def packet_callback(packet):
     global server_ip
